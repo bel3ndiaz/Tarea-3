@@ -24,6 +24,14 @@ app = Flask(__name__)
 app.secret_key = "clave-solo-para-mensajes-flash"
 
 
+# =====================================================================
+# Integrante 1: base de datos, configuración y archivar/reactivar
+# =====================================================================
+
+
+# ---------------------------------------------------------------------
+# Reglas de los documentos (Fase 3)
+# ---------------------------------------------------------------------
 EXTENSIONES_PERMITIDAS = ["pdf", "doc", "docx"]
 TAMANO_MAXIMO_MB = 50
 TAMANO_MAXIMO = TAMANO_MAXIMO_MB * 1024 * 1024  # en bytes
@@ -159,6 +167,10 @@ def reactivar(id):
     return cambiar_estado_instruccion(id, 1)
 
 
+# =====================================================================
+# Integrante 2: subida de documentos, nota de cambios y vista previa
+# =====================================================================
+
 
 # Primeros bytes ("firma") de cada formato. Sirven para detectar un archivo
 # renombrado: por ejemplo, una imagen a la que solo le cambiaron la extensión a .pdf.
@@ -190,7 +202,7 @@ def validar_archivo(archivo):
     if archivo is None or archivo.filename == "":
         return ["Debes elegir un documento PDF o Word."], None
 
-   
+    # Algunos navegadores envían la ruta completa: solo se conserva el nombre
     nombre = archivo.filename.replace("\\", "/").split("/")[-1].strip()
     extension = obtener_extension(nombre)
     if extension not in EXTENSIONES_PERMITIDAS:
@@ -379,7 +391,7 @@ def vista_previa(id):
         conexion.close()
         abort(404)
 
-    
+    # Todas las versiones de la instrucción, para la navegación anterior/siguiente
     cursor.execute("SELECT id, version FROM archivos WHERE instruccion_id = %s ORDER BY version",
                    (archivo["instruccion_id"],))
     versiones = cursor.fetchall()
@@ -393,7 +405,7 @@ def vista_previa(id):
                 siguiente = versiones[posicion + 1]
     estado = estado_archivo(archivo["version"], versiones[-1]["version"])
 
-
+    # Solo el .docx necesita leer el contenido para sacar su texto
     bloques = None
     aviso = None
     if archivo["extension"] == "docx":
@@ -419,6 +431,9 @@ def vista_previa(id):
                            bloques=bloques, aviso=aviso)
 
 
+# =====================================================================
+# Integrante 3: listado, versiones, detalle y búsqueda con filtros
+# =====================================================================
 
 
 @app.template_filter("fecha_hora")
@@ -440,7 +455,8 @@ def estado_archivo(version, version_mas_reciente):
         return "por_revisar"  # no debería pasar: sería mayor que la más reciente
 
 
-
+# Columnas del listado. La versión actual y el nombre del documento vigente se
+# calculan desde la tabla archivos SIN leer la columna contenido (LONGBLOB).
 COLUMNAS_LISTADO = (
     "SELECT i.id, i.codigo, i.titulo, i.area, i.enlace_video, i.fecha_actualizacion, i.activa, "
     "(SELECT MAX(a.version) FROM archivos a WHERE a.instruccion_id = i.id) AS version_actual, "
@@ -554,6 +570,327 @@ def detalle(id):
 
     return render_template("detalle.html", i=fila, versiones=versiones, historial=historial,
                            pasos=pasos)
+
+
+# =====================================================================
+# Integrante 4: registrar, modificar, pasos, eliminar, descargas y restaurar
+# =====================================================================
+
+
+# Tipo MIME con el que el navegador recibe cada formato al descargar
+TIPOS_MIME = {
+    "pdf": "application/pdf",
+    "doc": "application/msword",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+
+
+def validar_enlace(enlace):
+    if enlace != "" and not (enlace.startswith("http://") or enlace.startswith("https://")):
+        return ["El enlace de video debe comenzar con http:// o https:// (o dejarse vacío)."]
+    return []
+
+
+# ---------------------------------------------------------------------
+# Pasos de la instrucción (contenido editable desde Registrar y Modificar)
+# ---------------------------------------------------------------------
+MAX_PASOS = 50
+
+
+def leer_pasos_formulario():
+    """Lee los pasos que vienen del formulario. Cada paso llega en dos listas
+    paralelas (paso_descripcion y paso_control), en el orden de la pantalla.
+    Las filas vacías se ignoran. Devuelve (pasos, errores)."""
+    descripciones = request.form.getlist("paso_descripcion")
+    controles = request.form.getlist("paso_control")
+    pasos = []
+    errores = []
+    for posicion in range(len(descripciones)):
+        descripcion = descripciones[posicion].strip()
+        control = ""
+        if posicion < len(controles):
+            control = controles[posicion].strip()
+        if descripcion == "" and control == "":
+            continue  # fila en blanco: no cuenta como paso
+        numero = len(pasos) + 1
+        if descripcion == "":
+            errores.append("El paso " + str(numero) + " tiene punto de control pero le falta la descripción.")
+        elif len(descripcion) > 500:
+            errores.append("La descripción del paso " + str(numero) + " no puede tener más de 500 caracteres.")
+        if len(control) > 255:
+            errores.append("El punto de control del paso " + str(numero) + " no puede tener más de 255 caracteres.")
+        pasos.append({"descripcion": descripcion, "punto_control": control})
+    if len(pasos) > MAX_PASOS:
+        errores.append("Una instrucción puede tener como máximo " + str(MAX_PASOS) + " pasos.")
+    return pasos, errores
+
+
+def guardar_pasos(cursor, instruccion_id, pasos):
+    """Reemplaza los pasos de la instrucción: borra los anteriores e inserta
+    los nuevos numerados 1, 2, 3... en el orden recibido. El commit lo hace quien la llama."""
+    cursor.execute("DELETE FROM pasos WHERE instruccion_id = %s", (instruccion_id,))
+    numero = 1
+    for paso in pasos:
+        control = paso["punto_control"]
+        if control == "":
+            control = None  # sin punto de control se guarda NULL
+        cursor.execute(
+            "INSERT INTO pasos (instruccion_id, numero, descripcion, punto_control) "
+            "VALUES (%s, %s, %s, %s)",
+            (instruccion_id, numero, paso["descripcion"], control))
+        numero = numero + 1
+
+
+def obtener_pasos(cursor, instruccion_id):
+    """Pasos de una instrucción en orden."""
+    cursor.execute("SELECT numero, descripcion, punto_control FROM pasos "
+                   "WHERE instruccion_id = %s ORDER BY numero", (instruccion_id,))
+    return cursor.fetchall()
+
+
+@app.route("/instrucciones/nuevo", methods=["GET", "POST"])
+def nuevo():
+    errores = []
+    if request.method == "POST":
+        codigo = request.form["codigo"].strip().upper()
+        titulo = request.form["titulo"].strip()
+        area = request.form["area"]
+        enlace = request.form["enlace_video"].strip()
+        archivo = request.files.get("archivo")
+
+        if codigo == "":
+            errores.append("El código es obligatorio.")
+        elif len(codigo) > 20:
+            errores.append("El código no puede tener más de 20 caracteres.")
+        if titulo == "":
+            errores.append("El título es obligatorio.")
+        elif len(titulo) > 100:
+            errores.append("El título no puede tener más de 100 caracteres.")
+        if area not in AREAS:
+            errores.append("Selecciona un área de la lista.")
+        errores = errores + validar_enlace(enlace)
+
+        # Pasos escritos en el formulario
+        pasos, errores_pasos = leer_pasos_formulario()
+        errores = errores + errores_pasos
+
+        # El documento es opcional al registrar, pero si se elige uno se valida
+        datos_archivo = None
+        hay_archivo = archivo is not None and archivo.filename != ""
+        if hay_archivo:
+            errores_archivo, datos_archivo = validar_archivo(archivo)
+            errores = errores + errores_archivo
+
+        # Una instrucción necesita contenido: al menos un paso o un documento
+        if len(pasos) == 0 and not hay_archivo:
+            errores.append("Agrega al menos un paso o adjunta el documento de la instrucción.")
+
+        if not errores:
+            hoy = date.today()
+            if enlace == "":
+                enlace = None  # sin enlace se guarda NULL en la base de datos
+            conexion = conectar()
+            cursor = conexion.cursor(dictionary=True)
+            errores = error_si_no_cabe(cursor, datos_archivo)
+            version = None
+            if not errores:
+                try:
+                    cursor.execute(
+                        "INSERT INTO instrucciones (codigo, titulo, area, enlace_video, fecha_actualizacion) "
+                        "VALUES (%s, %s, %s, %s, %s)",
+                        (codigo, titulo, area, enlace, hoy))
+                    nuevo_id = cursor.lastrowid  # id que MySQL le asignó a la instrucción
+                    guardar_pasos(cursor, nuevo_id, pasos)
+                    if datos_archivo is not None:
+                        version = guardar_archivo(cursor, nuevo_id, datos_archivo, enlace)
+                    conexion.commit()  # instrucción, pasos y documento se guardan juntos o nada
+                except mysql.connector.Error as error:
+                    # 1062: el código ya existe (columna UNIQUE). Otro error se deja pasar.
+                    if error.errno != 1062:
+                        raise
+                    conexion.rollback()
+                    errores.append("Ya existe una instrucción con el código " + codigo + ".")
+            cursor.close()
+            conexion.close()
+            if not errores:
+                mensaje = ("Instrucción " + codigo + " registrada correctamente el " + formato_fecha(hoy)
+                           + " con " + str(len(pasos)) + " paso(s)")
+                if version is not None:
+                    mensaje = mensaje + " con el documento " + datos_archivo["nombre"] + " (versión 1)"
+                flash(mensaje + ".")
+                return redirect(url_for("listar"))
+
+    # Si hubo un error, el formulario vuelve a mostrar los pasos que se escribieron
+    pasos_formulario = []
+    if request.method == "POST":
+        pasos_formulario, _ = leer_pasos_formulario()
+    return render_template("nuevo.html", errores=errores, datos=request.form, areas=AREAS,
+                           tamano_maximo=TAMANO_MAXIMO_MB, pasos=pasos_formulario)
+
+
+@app.route("/instrucciones/editar/<int:id>", methods=["GET", "POST"])
+def editar(id):
+    """Modifica los datos y los pasos de la instrucción. La versión del documento
+    no se escribe a mano: cambia sola cada vez que se sube un documento nuevo."""
+    conexion = conectar()
+    cursor = conexion.cursor(dictionary=True)
+    cursor.execute("SELECT id, codigo, titulo, area, enlace_video, fecha_actualizacion "
+                   "FROM instrucciones WHERE id = %s", (id,))
+    fila = cursor.fetchone()
+    if fila is None:
+        cursor.close()
+        conexion.close()
+        abort(404)
+
+    errores = []
+    datos = fila  # valores que se muestran en el formulario
+    pasos = obtener_pasos(cursor, id)
+    if request.method == "POST":
+        titulo = request.form["titulo"].strip()
+        area = request.form["area"]
+        enlace = request.form["enlace_video"].strip()
+        datos = request.form
+        pasos, errores_pasos = leer_pasos_formulario()
+
+        if titulo == "":
+            errores.append("El título es obligatorio.")
+        elif len(titulo) > 100:
+            errores.append("El título no puede tener más de 100 caracteres.")
+        if area not in AREAS:
+            errores.append("Selecciona un área de la lista.")
+        errores = errores + validar_enlace(enlace) + errores_pasos
+
+        # Sin pasos solo se permite si la instrucción ya tiene un documento subido
+        if len(pasos) == 0:
+            cursor.execute("SELECT COUNT(*) AS total FROM archivos WHERE instruccion_id = %s", (id,))
+            if cursor.fetchone()["total"] == 0:
+                errores.append("Agrega al menos un paso: esta instrucción todavía no tiene documento.")
+
+        if not errores:
+            hoy = date.today()
+            if enlace == "":
+                enlace = None
+            cursor.execute(
+                "UPDATE instrucciones SET titulo = %s, area = %s, enlace_video = %s, "
+                "fecha_actualizacion = %s WHERE id = %s",
+                (titulo, area, enlace, hoy, id))
+            guardar_pasos(cursor, id, pasos)
+            conexion.commit()  # datos y pasos se guardan juntos
+            cursor.close()
+            conexion.close()
+            flash("Instrucción " + fila["codigo"] + " actualizada correctamente el "
+                  + formato_fecha(hoy) + " (" + str(len(pasos)) + " paso(s)).")
+            return redirect(url_for("detalle", id=id))
+
+    cursor.close()
+    conexion.close()
+    return render_template("editar.html", i=fila, datos=datos, errores=errores, areas=AREAS,
+                           pasos=pasos)
+
+
+@app.route("/instrucciones/eliminar/<int:id>", methods=["POST"])
+def eliminar(id):
+    """Solo se puede eliminar una instrucción que todavía no tiene documentos.
+    Las versiones están protegidas por ON DELETE RESTRICT: nunca se borran
+    al eliminar un registro."""
+    conexion = conectar()
+    cursor = conexion.cursor(dictionary=True)
+    cursor.execute("SELECT codigo FROM instrucciones WHERE id = %s", (id,))
+    fila = cursor.fetchone()
+    if fila is None:
+        cursor.close()
+        conexion.close()
+        abort(404)
+
+    # Se revisa ANTES de borrar, para dar un mensaje claro
+    cursor.execute(
+        "SELECT COUNT(*) AS total FROM archivos WHERE instruccion_id = %s", (id,))
+    total_archivos = cursor.fetchone()["total"]
+
+    if total_archivos > 0:
+        flash("No se puede eliminar " + fila["codigo"] + ": tiene " + str(total_archivos)
+              + " versión(es) del documento. El historial de versiones está protegido "
+              "(ON DELETE RESTRICT). Si ya no se usa, puedes archivarla desde su detalle.",
+              "error")
+    else:
+        try:
+            cursor.execute("DELETE FROM instrucciones WHERE id = %s", (id,))
+            conexion.commit()
+            flash("Instrucción " + fila["codigo"] + " eliminada.")
+        except mysql.connector.Error as error:
+            # Segunda protección: si aun así tiene filas relacionadas, MySQL lo
+            # rechaza con el error 1451 (o 1217 en versiones viejas)
+            if error.errno not in (1451, 1217):
+                raise
+            conexion.rollback()
+            flash("No se puede eliminar " + fila["codigo"]
+                  + ": tiene historial relacionado (ON DELETE RESTRICT).", "error")
+    cursor.close()
+    conexion.close()
+    return redirect(url_for("listar"))
+
+
+def enviar_archivo(id, como_adjunto):
+    """Busca el documento por su id y lo devuelve con su nombre original.
+    Es la ÚNICA consulta que lee la columna contenido."""
+    conexion = conectar()
+    cursor = conexion.cursor(dictionary=True)
+    cursor.execute("SELECT nombre_original, extension, contenido FROM archivos WHERE id = %s", (id,))
+    fila = cursor.fetchone()
+    cursor.close()
+    conexion.close()
+    if fila is None:
+        abort(404)
+    return send_file(io.BytesIO(fila["contenido"]),
+                     mimetype=TIPOS_MIME[fila["extension"]],
+                     as_attachment=como_adjunto,
+                     download_name=fila["nombre_original"])
+
+
+@app.route("/archivos/<int:id>/descargar")
+def descargar(id):
+    return enviar_archivo(id, True)
+
+
+@app.route("/archivos/<int:id>/restaurar", methods=["POST"])
+def restaurar(id):
+    """Vuelve a poner en uso una versión obsoleta copiándola como versión NUEVA.
+    No borra ni modifica ninguna versión: el historial queda completo."""
+    conexion = conectar()
+    cursor = conexion.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT a.instruccion_id, a.version, a.nombre_original, a.extension, a.contenido, "
+        "i.codigo, i.enlace_video, i.activa FROM archivos a "
+        "JOIN instrucciones i ON i.id = a.instruccion_id WHERE a.id = %s", (id,))
+    fila = cursor.fetchone()
+    if fila is None:
+        cursor.close()
+        conexion.close()
+        abort(404)
+
+    instruccion_id = fila["instruccion_id"]
+    mas_reciente = version_siguiente(cursor, instruccion_id) - 1
+    if fila["activa"] == 0:
+        flash(fila["codigo"] + " está archivada: reactívala para restaurar versiones.", "error")
+    elif estado_archivo(fila["version"], mas_reciente) == "vigente":
+        flash("La versión " + str(fila["version"]) + " ya es la vigente; no hace falta restaurarla.",
+              "error")
+    else:
+        datos = {"nombre": fila["nombre_original"], "extension": fila["extension"],
+                 "contenido": bytes(fila["contenido"])}
+        nueva = guardar_archivo(cursor, instruccion_id, datos, fila["enlace_video"],
+                                "Restaurada desde la versión " + str(fila["version"]))
+        conexion.commit()
+        flash("Se restauró la versión " + str(fila["version"]) + " de " + fila["codigo"]
+              + " como la nueva versión vigente " + str(nueva) + ".")
+    cursor.close()
+    conexion.close()
+    return redirect(url_for("detalle", id=instruccion_id))
+
+
+@app.errorhandler(404)
+def no_encontrado(error):
+    return render_template("no_encontrado.html"), 404
 
 
 if __name__ == "__main__":
