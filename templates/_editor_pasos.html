@@ -1,0 +1,34 @@
+{# Editor de pasos: se incluye en nuevo.html y editar.html.
+   Cada paso envía dos campos con el mismo nombre (paso_descripcion y paso_control);
+   en Flask se leen como listas con request.form.getlist(), en el orden de la pantalla. #}
+{% macro fila_paso(numero, paso) %}
+<li class="paso">
+  <span class="paso-numero">{{ numero }}</span>
+  <div class="paso-campos">
+    <textarea name="paso_descripcion" rows="2" maxlength="500"
+              placeholder="Describe qué debe hacer el operario en este paso">{{ paso.descripcion if paso else '' }}</textarea>
+    <input type="text" name="paso_control" maxlength="255"
+           placeholder="Punto de control o precaución (opcional)"
+           value="{{ (paso.punto_control or '') if paso else '' }}">
+  </div>
+  <div class="paso-botones">
+    <button type="button" class="mover-arriba" title="Mover arriba" aria-label="Mover arriba">↑</button>
+    <button type="button" class="mover-abajo" title="Mover abajo" aria-label="Mover abajo">↓</button>
+    <button type="button" class="quitar" title="Quitar paso" aria-label="Quitar paso">✕</button>
+  </div>
+</li>
+{% endmacro %}
+
+<fieldset class="editor-pasos">
+  <legend>Pasos de la instrucción</legend>
+  <p class="ayuda">Escribe cada paso en el orden en que se realiza. En «Punto de control» anota lo que
+     el operario debe verificar o la precaución de seguridad. Usa ↑ ↓ para reordenar.</p>
+  <ol id="lista-pasos" class="lista-pasos">
+    {% for paso in pasos %}{{ fila_paso(loop.index, paso) }}{% endfor %}
+    {% if not pasos %}{{ fila_paso(1, None) }}{% endif %}
+  </ol>
+  <button type="button" id="agregar-paso" class="secundario">+ Agregar paso</button>
+  {# Molde de un paso vacío: el JavaScript lo copia al presionar «Agregar paso» #}
+  <template id="plantilla-paso">{{ fila_paso("", None) }}</template>
+</fieldset>
+<script src="{{ url_for('static', filename='pasos.js') }}"></script>

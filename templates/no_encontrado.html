@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titulo %}No encontrado{% endblock %}
+{% block encabezado %}No encontrado (404){% endblock %}
+{% block subtitulo %}La página que buscas no está disponible.{% endblock %}
+{% block contenido %}
+<section class="panel">
+  <p class="error">La instrucción o el documento que buscas no existe o fue eliminado.</p>
+  <p><a class="enlace-boton" href="{{ url_for('listar') }}">Volver al listado</a></p>
+</section>
+{% endblock %}

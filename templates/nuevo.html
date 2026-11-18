@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block titulo %}Registrar instrucción{% endblock %}
+{% block encabezado %}Registrar instrucción{% endblock %}
+{% block subtitulo %}Escribe los pasos de la instrucción y, si quieres, adjunta un documento de apoyo.{% endblock %}
+{% block contenido %}
+{% if errores %}
+<ul class="error">
+  {% for e in errores %}<li>{{ e }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<section class="panel">
+{# enctype="multipart/form-data" es obligatorio: sin él el archivo nunca llega al servidor #}
+<form method="POST" action="{{ url_for('nuevo') }}" enctype="multipart/form-data">
+  <label for="codigo">Código (ej. IM-OFF-003)</label>
+  <input type="text" id="codigo" name="codigo" value="{{ datos.get('codigo', '') }}">
+
+  <label for="titulo">Título de la instrucción</label>
+  <input type="text" id="titulo" name="titulo" value="{{ datos.get('titulo', '') }}">
+
+  <label for="area">Área</label>
+  <select id="area" name="area">
+    {% for a in areas %}
+    <option value="{{ a }}" {% if datos.get('area') == a %}selected{% endif %}>{{ a }}</option>
+    {% endfor %}
+  </select>
+
+  <label for="enlace_video">Enlace del video de la instrucción (opcional)</label>
+  <input type="text" id="enlace_video" name="enlace_video" value="{{ datos.get('enlace_video', '') }}"
+         placeholder="https://...">
+
+  {% include "_editor_pasos.html" %}
+
+  <label for="archivo">Documento de apoyo (opcional, se guarda como versión 1)</label>
+  <input type="file" id="archivo" name="archivo" accept=".pdf,.doc,.docx">
+  <p class="ayuda">PDF o Word (.pdf, .doc, .docx), máximo {{ tamano_maximo }} MB.
+     Si hay un error tendrás que volver a elegir el archivo.</p>
+
+  <button type="submit" class="accion">Guardar instrucción</button>
+  <a class="enlace-boton secundario" href="{{ url_for('listar') }}">Cancelar</a>
+</form>
+</section>
+{% endblock %}

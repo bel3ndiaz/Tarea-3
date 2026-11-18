@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titulo %}Modificar instrucción{% endblock %}
+{% block antetitulo %}{{ i.codigo }}{% endblock %}
+{% block encabezado %}Modificar instrucción{% endblock %}
+{% block subtitulo %}Última actualización: {{ i.fecha_actualizacion|fecha }}{% endblock %}
+{% block contenido %}
+<p class="ficha">Aquí se editan los datos y los pasos. La versión del documento de apoyo cambia sola al
+  subir uno nuevo (<a href="{{ url_for('subir', id=i.id) }}">subir documento</a>).</p>
+
+{% if errores %}
+<ul class="error">
+  {% for e in errores %}<li>{{ e }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<section class="panel">
+<form method="POST" action="{{ url_for('editar', id=i.id) }}">
+  <label for="titulo">Título de la instrucción</label>
+  <input type="text" id="titulo" name="titulo" value="{{ datos['titulo'] }}">
+
+  <label for="area">Área</label>
+  <select id="area" name="area">
+    {% for a in areas %}
+    <option value="{{ a }}" {% if datos['area'] == a %}selected{% endif %}>{{ a }}</option>
+    {% endfor %}
+  </select>
+
+  <label for="enlace_video">Enlace del video de la instrucción (opcional)</label>
+  <input type="text" id="enlace_video" name="enlace_video" value="{{ datos['enlace_video'] or '' }}">
+
+  {% include "_editor_pasos.html" %}
+
+  <button type="submit" class="accion">Guardar cambios</button>
+  <a class="enlace-boton secundario" href="{{ url_for('detalle', id=i.id) }}">Cancelar</a>
+</form>
+</section>
+{% endblock %}
