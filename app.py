@@ -24,9 +24,7 @@ app = Flask(__name__)
 app.secret_key = "clave-solo-para-mensajes-flash"
 
 
-# =====================================================================
-# Integrante 1: base de datos, configuración y archivar/reactivar
-# =====================================================================
+
 
 
 # ---------------------------------------------------------------------
@@ -166,10 +164,6 @@ def archivar(id):
 def reactivar(id):
     return cambiar_estado_instruccion(id, 1)
 
-
-# =====================================================================
-# Integrante 2: subida de documentos, nota de cambios y vista previa
-# =====================================================================
 
 
 # Primeros bytes ("firma") de cada formato. Sirven para detectar un archivo
@@ -431,10 +425,6 @@ def vista_previa(id):
                            bloques=bloques, aviso=aviso)
 
 
-# =====================================================================
-# Integrante 3: listado, versiones, detalle y búsqueda con filtros
-# =====================================================================
-
 
 @app.template_filter("fecha_hora")
 def formato_fecha_hora(valor):
@@ -572,9 +562,6 @@ def detalle(id):
                            pasos=pasos)
 
 
-# =====================================================================
-# Integrante 4: registrar, modificar, pasos, eliminar, descargas y restaurar
-# =====================================================================
 
 
 # Tipo MIME con el que el navegador recibe cada formato al descargar
@@ -891,6 +878,112 @@ def restaurar(id):
 @app.errorhandler(404)
 def no_encontrado(error):
     return render_template("no_encontrado.html"), 404
+
+
+
+
+def clasificar_documentacion(tiene_documento, tiene_video):
+    """Regla del resumen: una instrucción está completa cuando ya tiene
+    documento subido Y enlace de video; si no, se indica qué le falta."""
+    if tiene_documento and tiene_video:
+        return "completa"
+    elif tiene_documento:
+        return "falta_video"
+    elif tiene_video:
+        return "falta_documento"
+    else:
+        return "falta_ambos"
+
+
+NOMBRES_ESTADO = {
+    "completa": "Completa",
+    "falta_video": "Falta video",
+    "falta_documento": "Falta documento",
+    "falta_ambos": "Falta documento y video",
+}
+
+
+@app.route("/instrucciones/exportar.csv")
+def exportar_csv():
+    """Descarga el listado (con los mismos filtros de la pantalla) como CSV para Excel."""
+    texto, area, estado = leer_filtros()
+    ver_archivadas = request.args.get("vista") == "archivadas"
+    instrucciones = consultar_instrucciones(texto, area, estado, activas=not ver_archivadas)
+
+    salida = io.StringIO()
+    # Punto y coma: es el separador que espera Excel en Windows configurado en
+    # español; con comas, Excel pondría cada fila completa en una sola columna.
+    escritor = csv.writer(salida, delimiter=";")
+    escritor.writerow(["Código", "Título", "Área", "Versión actual", "Documento vigente",
+                       "Enlace del video", "Estado", "Última actualización"])
+    for item in instrucciones:
+        i = item["datos"]
+        escritor.writerow([
+            i["codigo"], i["titulo"], i["area"],
+            i["version_actual"] if i["version_actual"] is not None else "",
+            i["archivo_vigente"] or "Sin documento",
+            i["enlace_video"] or "",
+            NOMBRES_ESTADO[item["estado"]],
+            formato_fecha(i["fecha_actualizacion"]),
+        ])
+
+    nombre = "instrucciones_" + date.today().isoformat() + ".csv"
+    # utf-8-sig agrega una marca al inicio para que Excel muestre bien las tildes
+    return Response(salida.getvalue().encode("utf-8-sig"),
+                    mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=" + nombre})
+
+
+@app.route("/resumen")
+def resumen():
+    conexion = conectar()
+    cursor = conexion.cursor(dictionary=True)
+    # Se consulta cada vez que se abre: si alguien sube un documento o agrega
+    # un video, el resumen cambia solo. No se lee la columna contenido.
+    # Solo cuentan las instrucciones en uso (las archivadas no)
+    cursor.execute(COLUMNAS_LISTADO + "WHERE i.activa = 1 ORDER BY i.codigo")
+    filas = cursor.fetchall()
+    cursor.close()
+    conexion.close()
+
+    # Una lista por clasificación (su tamaño es el contador)
+    grupos = {"completa": [], "falta_video": [], "falta_documento": [], "falta_ambos": []}
+    # Avance por área: {"Acabados": {"total": 2, "completas": 1}, ...}
+    por_area = {}
+
+    # Repetición: se recorre cada instrucción de la base de datos
+    for fila in filas:
+        tiene_documento = fila["version_actual"] is not None
+        tiene_video = fila["enlace_video"] is not None
+        # Decisión con if / elif / else (dentro de clasificar_documentacion)
+        estado = clasificar_documentacion(tiene_documento, tiene_video)
+        grupos[estado].append(fila)
+
+        if fila["area"] not in por_area:
+            por_area[fila["area"]] = {"total": 0, "completas": 0}
+        por_area[fila["area"]]["total"] = por_area[fila["area"]]["total"] + 1
+        if estado == "completa":
+            por_area[fila["area"]]["completas"] = por_area[fila["area"]]["completas"] + 1
+
+    areas = []
+    for area in sorted(por_area):
+        datos = por_area[area]
+        porcentaje = round(datos["completas"] * 100 / datos["total"])
+        areas.append({"area": area, "total": datos["total"],
+                      "completas": datos["completas"], "porcentaje": porcentaje})
+
+    total = len(filas)
+    completas = len(grupos["completa"])
+    return render_template(
+        "resumen.html",
+        total=total,
+        total_completas=completas,
+        total_incompletas=total - completas,
+        grupos=grupos,
+        nombres_estado=NOMBRES_ESTADO,
+        areas=areas,
+        total_archivadas=contar_archivadas(),
+    )
 
 
 if __name__ == "__main__":
