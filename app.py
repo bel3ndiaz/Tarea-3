@@ -6,6 +6,8 @@ import csv
 import io
 import mysql.connector
 
+# python-docx lee el texto de los documentos Word (.docx) para la vista previa.
+# Si no está instalado, la página sigue funcionando y solo avisa.
 try:
     import docx
     from docx.oxml.ns import qn
@@ -22,10 +24,12 @@ app = Flask(__name__)
 app.secret_key = "clave-solo-para-mensajes-flash"
 
 
-
 EXTENSIONES_PERMITIDAS = ["pdf", "doc", "docx"]
 TAMANO_MAXIMO_MB = 50
-TAMANO_MAXIMO = TAMANO_MAXIMO_MB * 1024 * 1024  
+TAMANO_MAXIMO = TAMANO_MAXIMO_MB * 1024 * 1024  # en bytes
+# Límite duro de toda la petición: si alguien envía algo enorme, Flask lo corta
+# antes de leerlo (error 413). Los archivos entre 50 y 64 MB llegan y se rechazan
+# en la validación con un mensaje en el mismo formulario.
 app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024
 
 
@@ -47,6 +51,10 @@ def conectar():
         user="root",
         password="",
         database="biblioteca_impresos",
+        # buffered: cada consulta se lee completa al ejecutarla, así se pueden
+        # hacer varias consultas seguidas con el mismo cursor sin el error
+        # "Unread result found" (por ejemplo: buscar la instrucción y luego
+        # calcular MAX(version) antes de insertar el documento).
         buffered=True,
     )
 
@@ -151,12 +159,13 @@ def reactivar(id):
     return cambiar_estado_instruccion(id, 1)
 
 
-if __name__ == "__main__":
-    app.run(debug=True)
+
+# Primeros bytes ("firma") de cada formato. Sirven para detectar un archivo
+# renombrado: por ejemplo, una imagen a la que solo le cambiaron la extensión a .pdf.
 FIRMAS = {
-    "pdf": b"%PDF",                 
-    "doc": b"\xd0\xcf\x11\xe0",     
-    "docx": b"PK\x03\x04",
+    "pdf": b"%PDF",                 # PDF
+    "doc": b"\xd0\xcf\x11\xe0",     # Word 97-2003 (formato OLE)
+    "docx": b"PK\x03\x04",          # Word moderno (es un ZIP por dentro)
 }
 
 
@@ -235,7 +244,7 @@ def guardar_archivo(cursor, instruccion_id, datos, enlace, nota=None):
         "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
         (instruccion_id, version, datos["nombre"], datos["extension"],
          len(datos["contenido"]), datos["contenido"], enlace, nota, ahora))
-  
+    # Historial de versiones: queda registro de qué se subió, por qué y cuándo
     accion = "Subió la versión " + str(version) + ": " + datos["nombre"]
     if nota:
         accion = accion + " · " + nota
@@ -243,7 +252,7 @@ def guardar_archivo(cursor, instruccion_id, datos, enlace, nota=None):
         "INSERT INTO historial_versiones (instruccion_id, version, accion, fecha) "
         "VALUES (%s, %s, %s, %s)",
         (instruccion_id, version, accion[:255], ahora))
-   
+    # El enlace del video y la fecha de la instrucción quedan al día
     cursor.execute(
         "UPDATE instrucciones SET enlace_video = %s, fecha_actualizacion = %s WHERE id = %s",
         (enlace, ahora.date(), instruccion_id))
@@ -320,7 +329,7 @@ def leer_docx(contenido):
               {"tipo": "lista", "elementos": ["...", "..."]}, ...]"""
     documento = docx.Document(io.BytesIO(contenido))
     bloques = []
-
+    # Se recorre el cuerpo del documento en orden (párrafos y tablas mezclados)
     for elemento in documento.element.body.iterchildren():
         if elemento.tag == qn("w:p"):
             parrafo = Paragraph(elemento, documento)
@@ -334,7 +343,8 @@ def leer_docx(contenido):
                     nivel = min(int(estilo[-1]), 3)
                 bloques.append({"tipo": "titulo", "nivel": nivel, "texto": texto})
             elif "List" in estilo:
-                
+                # "List Number" es una lista numerada; "List Bullet", con viñetas.
+                # Los elementos seguidos del mismo tipo se juntan en una sola lista.
                 numerada = "Number" in estilo
                 if bloques and bloques[-1]["tipo"] == "lista" and bloques[-1]["numerada"] == numerada:
                     bloques[-1]["elementos"].append(texto)
@@ -358,7 +368,7 @@ def vista_previa(id):
     botones para pasar a la versión anterior o siguiente."""
     conexion = conectar()
     cursor = conexion.cursor(dictionary=True)
-
+    # Primero solo los datos (sin el contenido): basta para el PDF y el .doc
     cursor.execute(
         "SELECT a.id, a.instruccion_id, a.version, a.nombre_original, a.extension, "
         "a.tamano_bytes, a.nota_cambio, a.fecha_subida, i.codigo, i.titulo "
@@ -369,7 +379,7 @@ def vista_previa(id):
         conexion.close()
         abort(404)
 
- 
+    
     cursor.execute("SELECT id, version FROM archivos WHERE instruccion_id = %s ORDER BY version",
                    (archivo["instruccion_id"],))
     versiones = cursor.fetchall()
@@ -382,6 +392,7 @@ def vista_previa(id):
             if posicion < len(versiones) - 1:
                 siguiente = versiones[posicion + 1]
     estado = estado_archivo(archivo["version"], versiones[-1]["version"])
+
 
     bloques = None
     aviso = None
@@ -406,6 +417,143 @@ def vista_previa(id):
     return render_template("vista.html", a=archivo, estado=estado, anterior=anterior,
                            siguiente=siguiente, total_versiones=len(versiones),
                            bloques=bloques, aviso=aviso)
+
+
+
+
+@app.template_filter("fecha_hora")
+def formato_fecha_hora(valor):
+    """Muestra fecha y hora como 15/10/2026 14:05."""
+    if hasattr(valor, "strftime"):
+        return valor.strftime("%d/%m/%Y %H:%M")
+    texto = str(valor)
+    return formato_fecha(texto[:10]) + " " + texto[11:16]
+
+
+def estado_archivo(version, version_mas_reciente):
+    """Regla del reto: la versión más reciente es la vigente; las demás, obsoletas."""
+    if version == version_mas_reciente:
+        return "vigente"
+    elif version < version_mas_reciente:
+        return "obsoleta"
+    else:
+        return "por_revisar"  # no debería pasar: sería mayor que la más reciente
+
+
+
+COLUMNAS_LISTADO = (
+    "SELECT i.id, i.codigo, i.titulo, i.area, i.enlace_video, i.fecha_actualizacion, i.activa, "
+    "(SELECT MAX(a.version) FROM archivos a WHERE a.instruccion_id = i.id) AS version_actual, "
+    "(SELECT a.nombre_original FROM archivos a WHERE a.instruccion_id = i.id "
+    " ORDER BY a.version DESC LIMIT 1) AS archivo_vigente "
+    "FROM instrucciones i "
+)
+
+
+def consultar_instrucciones(texto, area, estado, activas=True):
+    """Lista de instrucciones filtrada. Devuelve [{"datos": fila, "estado": ...}].
+    - texto: busca en código, título, área y en el nombre de CUALQUIER versión del documento
+    - area: "" para todas
+    - estado: "" para todos, o una clave de NOMBRES_ESTADO
+    - activas: True para las que están en uso, False para las archivadas"""
+    # Por defecto solo se muestran las activas; las archivadas tienen su propia vista
+    condiciones = ["i.activa = %s"]
+    parametros = [1 if activas else 0]
+    if texto != "":
+        patron = "%" + texto + "%"
+        condiciones.append(
+            "(i.titulo LIKE %s OR i.codigo LIKE %s OR i.area LIKE %s OR EXISTS ("
+            "SELECT 1 FROM archivos a WHERE a.instruccion_id = i.id AND a.nombre_original LIKE %s))")
+        parametros = parametros + [patron, patron, patron, patron]
+    if area != "":
+        condiciones.append("i.area = %s")
+        parametros.append(area)
+
+    consulta = COLUMNAS_LISTADO
+    if condiciones:
+        consulta = consulta + "WHERE " + " AND ".join(condiciones) + " "
+    consulta = consulta + "ORDER BY i.codigo"
+
+    conexion = conectar()
+    cursor = conexion.cursor(dictionary=True)
+    cursor.execute(consulta, tuple(parametros))
+    filas = cursor.fetchall()
+    cursor.close()
+    conexion.close()
+
+    instrucciones = []
+    for fila in filas:
+        estado_fila = clasificar_documentacion(fila["version_actual"] is not None,
+                                               fila["enlace_video"] is not None)
+        # El estado se calcula en Python, así que el filtro por estado se aplica aquí
+        if estado == "" or estado == estado_fila:
+            instrucciones.append({"datos": fila, "estado": estado_fila})
+    return instrucciones
+
+
+def leer_filtros():
+    """Lee los filtros de la URL (?q=...&area=...&estado=...) y descarta valores inválidos."""
+    texto = request.args.get("q", "").strip()
+    area = request.args.get("area", "")
+    estado = request.args.get("estado", "")
+    if area not in AREAS:
+        area = ""
+    if estado not in NOMBRES_ESTADO:
+        estado = ""
+    return texto, area, estado
+
+
+@app.route("/instrucciones")
+def listar():
+    texto, area, estado = leer_filtros()
+    ver_archivadas = request.args.get("vista") == "archivadas"
+    instrucciones = consultar_instrucciones(texto, area, estado, activas=not ver_archivadas)
+    hay_filtros = texto != "" or area != "" or estado != ""
+    return render_template("listado.html", instrucciones=instrucciones, q=texto,
+                           area=area, estado=estado, hay_filtros=hay_filtros,
+                           areas=AREAS, nombres_estado=NOMBRES_ESTADO,
+                           ver_archivadas=ver_archivadas, total_archivadas=contar_archivadas())
+
+
+@app.route("/instrucciones/<int:id>")
+def detalle(id):
+    conexion = conectar()
+    cursor = conexion.cursor(dictionary=True)
+    # LEFT JOIN: une la instrucción con todas sus versiones del documento.
+    # Si todavía no tiene documentos, igual aparece (con columnas de archivo en NULL).
+    # Solo se piden las columnas que se muestran: nunca a.contenido.
+    cursor.execute(
+        "SELECT i.id, i.codigo, i.titulo, i.area, i.enlace_video, i.fecha_actualizacion, "
+        "i.activa, i.fecha_archivado, "
+        "a.id AS archivo_id, a.version, a.nombre_original, a.extension, a.tamano_bytes, a.nota_cambio, "
+        "a.enlace_video AS video_version, a.fecha_subida "
+        "FROM instrucciones i "
+        "LEFT JOIN archivos a ON a.instruccion_id = i.id "
+        "WHERE i.id = %s ORDER BY a.version DESC", (id,))
+    filas = cursor.fetchall()
+
+    if len(filas) == 0:
+        cursor.close()
+        conexion.close()
+        abort(404)
+
+    # Historial de versiones (tabla protegida con ON DELETE RESTRICT)
+    cursor.execute("SELECT version, accion, fecha FROM historial_versiones "
+                   "WHERE instruccion_id = %s ORDER BY fecha DESC, id DESC", (id,))
+    historial = cursor.fetchall()
+    pasos = obtener_pasos(cursor, id)
+    cursor.close()
+    conexion.close()
+
+    fila = filas[0]  # los datos de la instrucción se repiten en cada fila del JOIN
+    versiones = []
+    if fila["archivo_id"] is not None:
+        mas_reciente = filas[0]["version"]  # vienen ordenadas de mayor a menor
+        for f in filas:
+            versiones.append({"datos": f, "estado": estado_archivo(f["version"], mas_reciente)})
+
+    return render_template("detalle.html", i=fila, versiones=versiones, historial=historial,
+                           pasos=pasos)
 
 
 if __name__ == "__main__":
