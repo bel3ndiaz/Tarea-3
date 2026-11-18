@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block titulo %}Subir documento · {{ i.codigo }}{% endblock %}
+{% block antetitulo %}{{ i.codigo }} · {{ i.area }}{% endblock %}
+{% block encabezado %}Subir documento{% endblock %}
+{% block subtitulo %}{{ i.titulo }}{% endblock %}
+{% block contenido %}
+<p class="ficha">Este documento se guardará como la <strong>versión {{ proxima }}</strong>.
+  {% if proxima > 1 %}Las versiones anteriores se conservan.{% endif %}</p>
+
+{% if errores %}
+<ul class="error">
+  {% for e in errores %}<li>{{ e }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<section class="panel">
+{# enctype="multipart/form-data" es obligatorio: sin él el archivo nunca llega al servidor #}
+<form method="POST" action="{{ url_for('subir', id=i.id) }}" enctype="multipart/form-data">
+  <label for="archivo">Documento (PDF o Word)</label>
+  <input type="file" id="archivo" name="archivo" accept=".pdf,.doc,.docx">
+  <p class="ayuda">Tipos permitidos: .pdf, .doc, .docx · Tamaño máximo: {{ tamano_maximo }} MB.</p>
+
+  <label for="nota_cambio">¿Qué cambió en esta versión?{% if proxima == 1 %} (opcional){% endif %}</label>
+  <textarea id="nota_cambio" name="nota_cambio" rows="3" maxlength="300"
+            placeholder="Ej.: se agregó la verificación de densidad con densitómetro">{{ datos['nota_cambio'] or '' }}</textarea>
+  {% if proxima > 1 %}<p class="ayuda">Obligatorio desde la versión 2, para que el operario sepa qué es distinto.</p>{% endif %}
+
+  <label for="enlace_video">Enlace del video de la instrucción (opcional)</label>
+  <input type="text" id="enlace_video" name="enlace_video" value="{{ datos['enlace_video'] or '' }}"
+         placeholder="https://...">
+
+  <button type="submit" class="accion">Subir versión {{ proxima }}</button>
+  <a class="enlace-boton secundario" href="{{ url_for('detalle', id=i.id) }}">Cancelar</a>
+</form>
+</section>
+{% endblock %}
