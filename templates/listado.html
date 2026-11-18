@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block titulo %}Instrucciones{% endblock %}
+{% block encabezado %}Instrucciones de trabajo{% if ver_archivadas %} archivadas{% endif %}{% endblock %}
+{% block subtitulo %}{% if ver_archivadas %}Instrucciones retiradas del uso diario: sus documentos y su historial se conservan.{% else %}La versión oficial de cada instrucción, en un solo lugar y para todos los turnos.{% endif %}{% endblock %}
+{% block contenido %}
+<section class="panel">
+  <form method="GET" action="{{ url_for('listar') }}" class="busqueda">
+    {% if ver_archivadas %}<input type="hidden" name="vista" value="archivadas">{% endif %}
+    <input type="text" name="q" value="{{ q }}" placeholder="Buscar por código, título, área o nombre de archivo">
+    <select name="area" aria-label="Área">
+      <option value="">Todas las áreas</option>
+      {% for a in areas %}<option value="{{ a }}" {% if a == area %}selected{% endif %}>{{ a }}</option>{% endfor %}
+    </select>
+    <select name="estado" aria-label="Estado">
+      <option value="">Todos los estados</option>
+      {% for clave, nombre in nombres_estado.items() %}
+      <option value="{{ clave }}" {% if clave == estado %}selected{% endif %}>{{ nombre }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Buscar</button>
+    {% if hay_filtros %}<a class="enlace-boton secundario" href="{{ url_for('listar') }}">Limpiar</a>{% endif %}
+  </form>
+
+  <div class="barra-listado">
+    <span>
+      {% if hay_filtros %}{{ instrucciones|length }} resultado(s).{% endif %}
+      {% if ver_archivadas %}<a class="enlace-vista" href="{{ url_for('listar') }}">← Volver a las instrucciones activas</a>
+      {% elif total_archivadas %}<a class="enlace-vista" href="{{ url_for('listar', vista='archivadas') }}">Ver archivadas ({{ total_archivadas }})</a>{% endif %}
+    </span>
+    <a class="enlace-boton secundario exportar" href="{{ url_for('exportar_csv', q=q, area=area, estado=estado, vista='archivadas' if ver_archivadas else None) }}">Exportar a CSV{% if hay_filtros %} (con estos filtros){% endif %}</a>
+  </div>
+</section>
+
+<section class="panel">
+{% if instrucciones %}
+<table>
+  <thead>
+    <tr>
+      <th>Código</th><th>Título</th><th>Área</th>
+      <th>Documento vigente</th><th>Video</th><th>Actualizada</th><th>Estado</th><th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for item in instrucciones %}
+    {% set i = item.datos %}
+    <tr class="{{ item.estado }}">
+      <td>{{ i.codigo }}</td>
+      <td><a class="enlace-titulo" href="{{ url_for('detalle', id=i.id) }}">{{ i.titulo }}</a></td>
+      <td>{{ i.area }}</td>
+      <td class="archivo">{% if i.version_actual %}<strong>v{{ i.version_actual }}</strong> · <span class="nombre-corto" title="{{ i.archivo_vigente }}">{{ i.archivo_vigente }}</span>
+          {% else %}<span class="vacio">Sin documento</span>{% endif %}</td>
+      <td>{% if i.enlace_video %}<a href="{{ i.enlace_video }}" target="_blank" rel="noopener">Sí</a>{% else %}No{% endif %}</td>
+      <td>{{ i.fecha_actualizacion|fecha }}</td>
+      <td><span class="etiqueta {{ item.estado }}">{{ nombres_estado[item.estado] }}</span></td>
+      <td class="acciones">
+        <a class="enlace-boton" href="{{ url_for('editar', id=i.id) }}">Modificar</a>
+        <a class="enlace-boton secundario" href="{{ url_for('subir', id=i.id) }}">Subir</a>
+        <form method="POST" action="{{ url_for('eliminar', id=i.id) }}"
+              onsubmit="return confirm('¿Eliminar la instrucción {{ i.codigo }}? Solo se puede si todavía no tiene documentos.');">
+          <button type="submit" class="peligro">Eliminar</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="vacio">No hay instrucciones que coincidan.</p>
+{% endif %}
+</section>
+{% endblock %}
