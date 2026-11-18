@@ -1,3 +1,9 @@
+/* =====================================================================
+   Hoja de estilos única del sitio
+   Identidad visual de Impresos Múltiples: azul de marca, navy profundo,
+   naranja para las acciones principales, tipografía Ubuntu y tarjetas
+   blancas con esquinas redondeadas, como en su sitio web.
+   ===================================================================== */
 :root {
   --azul: #0950c3;            /* azul de marca: títulos y enlaces */
   --azul-hover: #003c9e;
@@ -101,6 +107,15 @@ button.peligro { background: #fff; color: var(--rojo); border-color: #f1c4c4; }
 button.peligro:hover { background: var(--rojo); color: #fff; border-color: var(--rojo); }
 td.acciones .enlace-boton, td.acciones button { margin-top: 0; padding: 5px 10px; font-size: .85em; }
 
+/* ---------- Búsqueda y filtros ---------- */
+.busqueda { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0; }
+.busqueda input[type=text] { flex: 1 1 280px; width: auto; }
+.busqueda select { width: auto; }
+.busqueda button, .busqueda .enlace-boton { margin-top: 0; }
+.barra-listado { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+                 flex-wrap: wrap; margin: 16px 0 0; color: var(--texto-suave); }
+.enlace-boton.exportar { margin-top: 0; padding: 7px 14px; font-size: .9em; }
+.enlace-vista { font-weight: 500; text-decoration: none; }
 
 /* ---------- Mensajes ---------- */
 .error, .exito, .aviso-archivada, .aviso-obsoleta { border-radius: 12px; padding: 12px 16px; font-weight: 500;
