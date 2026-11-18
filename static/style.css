@@ -142,6 +142,52 @@ ul.error { padding-left: 36px; }
 .documento-word table { width: auto; }
 .documento-word td { border: 1px solid var(--borde); }
 
+/* ---------- Pasos: editor (Registrar y Modificar) ---------- */
+.editor-pasos { border: 1px solid var(--borde); border-radius: 14px; padding: 18px 20px 20px; margin: 24px 0 8px;
+                background: var(--fondo); }
+.editor-pasos legend { font-weight: 700; color: var(--azul); font-size: 1.1em; padding: 0 8px; }
+.editor-pasos .ayuda { margin: 0 0 14px; }
+.lista-pasos { list-style: none; margin: 0; padding: 0; }
+.paso { display: flex; gap: 14px; align-items: flex-start; background: #fff; border: 1px solid var(--borde);
+        border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+.paso-numero { flex: 0 0 34px; height: 34px; border-radius: 50%; background: var(--azul); color: #fff;
+               display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.paso-campos { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.paso-campos textarea, .paso-campos input[type=text] { width: 100%; }
+.paso-botones { display: flex; gap: 6px; }
+.paso-botones button { margin-top: 0; padding: 4px 10px; background: #fff; color: var(--azul);
+                       border-color: #c8d6ef; font-size: .95em; }
+.paso-botones button:hover { background: var(--fondo-azul); }
+.paso-botones button.quitar { color: var(--rojo); border-color: #f1c4c4; }
+.paso-botones button.quitar:hover { background: var(--rojo-fondo); }
+#agregar-paso { margin-top: 6px; }
+
+/* ---------- Pasos: lectura en el detalle ---------- */
+.encabezado-panel { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.encabezado-panel h2 { margin: 0; }
+.encabezado-panel .imprimir { margin-top: 0; }
+.pasos-lectura { list-style: none; margin: 18px 0 0; padding: 0; }
+.pasos-lectura li { display: flex; gap: 16px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--borde); }
+.pasos-lectura li:last-child { border-bottom: 0; }
+.paso-texto { margin: 5px 0 0; font-size: 1.05em; }
+.paso-control { margin: 8px 0 0; padding: 8px 12px; background: var(--ambar-fondo); color: var(--ambar);
+                border-radius: 8px; border-left: 4px solid var(--naranja); font-size: .93em; }
+
+/* ---------- Impresión: solo la hoja de la instrucción ---------- */
+@media print {
+  .barra, .pie, main > p, main > form, .exito, .error, .aviso-archivada,
+  .panel:not(.hoja-pasos), .imprimir { display: none !important; }
+  body { background: #fff; }
+  .hero { background: none; color: #000; padding: 0 0 12px; border-bottom: 3px solid #000; }
+  .hero::before, .hero::after { display: none; }
+  .hero-antetitulo, .hero-subtitulo { color: #333; }
+  main { margin: 16px 0 0; padding: 0; max-width: none; }
+  .panel { box-shadow: none; border: 0; padding: 0; }
+  .paso-numero { background: #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .paso-control { border-left-color: #000; background: #f2f2f2; color: #000; }
+  .pasos-lectura li { break-inside: avoid; }
+}
+
 /* ---------- Pie de página (navy, como el de su sitio) ---------- */
 .pie { background: var(--navy); color: #cbd5e1; }
 .pie-contenido { max-width: 1240px; margin: 0 auto; padding: 44px 24px 28px; display: grid;
