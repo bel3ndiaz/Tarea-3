@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block titulo %}Resumen{% endblock %}
+{% block encabezado %}Resumen de documentación{% endblock %}
+{% block subtitulo %}Qué instrucciones ya tienen documento y video, y a cuáles les falta algo.{% endblock %}
+{% block contenido %}
+<section class="panel">
+  <p style="margin:0">Total de instrucciones revisadas: <strong id="total">{{ total }}</strong>.
+     Una instrucción está <strong>completa</strong> cuando ya tiene documento subido y enlace de video.
+     {% if total_archivadas %}No se cuentan {{ total_archivadas }} instrucción(es) archivada(s).{% endif %}</p>
+</section>
+
+<div class="tarjetas">
+  <section class="tarjeta completa">
+    <h2>Completas</h2>
+    <p class="numero">{{ total_completas }}</p>
+    <p>Con documento y video</p>
+    <ul>{% for f in grupos.completa %}<li><a href="{{ url_for('detalle', id=f.id) }}">{{ f.codigo }}</a> · {{ f.titulo }} (v{{ f.version_actual }})</li>{% endfor %}</ul>
+  </section>
+
+  <section class="tarjeta incompleta">
+    <h2>Les falta algo</h2>
+    <p class="numero">{{ total_incompletas }}</p>
+    {% for clave in ["falta_documento", "falta_video", "falta_ambos"] %}
+    <h3>{{ nombres_estado[clave] }}: {{ grupos[clave]|length }}</h3>
+    <ul>{% for f in grupos[clave] %}<li><a href="{{ url_for('detalle', id=f.id) }}">{{ f.codigo }}</a> · {{ f.titulo }}</li>{% endfor %}</ul>
+    {% endfor %}
+  </section>
+</div>
+
+<section class="panel">
+  <h2>Avance por área</h2>
+  <table>
+    <thead><tr><th>Área</th><th>Instrucciones</th><th>Completas</th><th>Avance</th></tr></thead>
+    <tbody>
+    {% for a in areas %}
+      <tr>
+        <td>{{ a.area }}</td><td>{{ a.total }}</td><td>{{ a.completas }}</td>
+        <td><div class="progreso"><span style="width: {{ a.porcentaje }}%"></span></div> {{ a.porcentaje }} %</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
