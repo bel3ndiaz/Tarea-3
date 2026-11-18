@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block titulo %}Biblioteca Digital{% endblock %} | Impresos Múltiples</title>
+{# Tipografía Ubuntu, la misma familia redondeada del sitio de Impresos Múltiples.
+   Si no hay internet, el navegador usa Segoe UI o Arial (ver style.css). #}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+{# Sección del menú que se marca como activa, según la página abierta #}
+{% if request.endpoint == "nuevo" %}{% set seccion = "registrar" %}
+{% elif request.endpoint == "resumen" %}{% set seccion = "resumen" %}
+{% else %}{% set seccion = "instrucciones" %}{% endif %}
+
+<header class="barra">
+  <div class="barra-contenido">
+    <a class="marca" href="{{ url_for('listar') }}">
+      <img src="{{ url_for('static', filename='img/logo-impresos.png') }}" alt="Impresos Múltiples">
+      <span class="marca-sistema">Biblioteca Digital<br>de Instrucciones</span>
+    </a>
+    <nav>
+      <a href="{{ url_for('listar') }}" class="{{ 'activo' if seccion == 'instrucciones' }}">Instrucciones</a>
+      <a href="{{ url_for('nuevo') }}" class="{{ 'activo' if seccion == 'registrar' }}">Registrar</a>
+      <a href="{{ url_for('resumen') }}" class="{{ 'activo' if seccion == 'resumen' }}">Resumen</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-contenido">
+    <p class="hero-antetitulo">{% block antetitulo %}Junto a ti desde 1992{% endblock %}</p>
+    <h1>{% block encabezado %}Biblioteca Digital{% endblock %}</h1>
+    <p class="hero-subtitulo">{% block subtitulo %}{% endblock %}</p>
+  </div>
+</section>
+
+<main>
+  {# Cada mensaje trae su categoría: "error" se muestra en rojo, el resto en verde #}
+  {% for categoria, mensaje in get_flashed_messages(with_categories=true) %}
+  <p class="{{ 'error' if categoria == 'error' else 'exito' }}">{{ mensaje }}</p>
+  {% endfor %}
+  {% block contenido %}{% endblock %}
+</main>
+
+<footer class="pie">
+  <div class="pie-contenido">
+    <div class="pie-marca">
+      <img src="{{ url_for('static', filename='img/logo-impresos-blanco.png') }}" alt="Impresos Múltiples">
+      <p class="pie-lema">Junto a ti desde 1992</p>
+      <p class="pie-texto">Biblioteca Digital de Instrucciones de Trabajo: una sola versión oficial
+        de cada instrucción, disponible para todos los turnos.</p>
+    </div>
+    <div>
+      <h3>Biblioteca</h3>
+      <a href="{{ url_for('listar') }}">Instrucciones</a>
+      <a href="{{ url_for('nuevo') }}">Registrar instrucción</a>
+      <a href="{{ url_for('resumen') }}">Resumen de documentación</a>
+    </div>
+    <div>
+      <h3>Documentos</h3>
+      <p class="pie-texto">PDF y Word (.pdf, .doc, .docx) de hasta {{ tamano_maximo_mb }} MB.<br>
+        Cada nueva subida crea una versión; las anteriores se conservan.</p>
+    </div>
+  </div>
+  <div class="pie-legal">
+    <span>© 2026 Impresos Múltiples · Biblioteca Digital de Instrucciones</span>
+    <span>Prototipo académico · Fase 3</span>
+  </div>
+</footer>
+</body>
+</html>
