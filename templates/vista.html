@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block titulo %}{{ a.codigo }} · v{{ a.version }}{% endblock %}
+{% block antetitulo %}Vista previa del documento{% endblock %}
+{% block encabezado %}{{ a.codigo }} · {{ a.titulo }}{% endblock %}
+{% block subtitulo %}Versión {{ a.version }} · {{ a.nombre_original }}{% endblock %}
+{% block contenido %}
+<section class="panel">
+<div class="vista-cabecera">
+  <div>
+    <strong>Versión {{ a.version }} de {{ total_versiones }}</strong>
+    {% if estado == "vigente" %}<span class="etiqueta vigente">Vigente</span>
+    {% elif estado == "obsoleta" %}<span class="etiqueta obsoleta">Obsoleta</span>
+    {% else %}<span class="etiqueta por_revisar">Por revisar</span>{% endif %}
+    <br><span class="archivo">{{ a.nombre_original }}</span> <span class="tipo">{{ a.extension|upper }}</span>
+    · {{ a.tamano_bytes|tamano }} · subido el {{ a.fecha_subida|fecha_hora }}
+    {% if a.nota_cambio %}<br><strong>Qué cambió:</strong> {{ a.nota_cambio }}{% endif %}
+  </div>
+  <div class="vista-navegacion">
+    {% if anterior %}<a class="enlace-boton secundario" href="{{ url_for('vista_previa', id=anterior.id) }}">← v{{ anterior.version }}</a>{% endif %}
+    {% if siguiente %}<a class="enlace-boton secundario" href="{{ url_for('vista_previa', id=siguiente.id) }}">v{{ siguiente.version }} →</a>{% endif %}
+    <a class="enlace-boton" href="{{ url_for('descargar', id=a.id) }}">Descargar</a>
+  </div>
+</div>
+</section>
+
+{% if estado == "obsoleta" %}
+<p class="aviso-obsoleta">Esta versión ya no es la vigente. Consúltala solo como referencia.</p>
+{% endif %}
+
+{% if a.extension == "pdf" %}
+  {# El navegador muestra el PDF con su propio visor dentro del marco #}
+  <iframe class="visor-pdf" src="{{ url_for('ver_archivo', id=a.id) }}" title="{{ a.nombre_original }}"></iframe>
+  <p class="ayuda">¿No se ve? <a href="{{ url_for('ver_archivo', id=a.id) }}" target="_blank" rel="noopener">Abrir el PDF en otra pestaña</a>.</p>
+{% elif bloques %}
+  <article class="documento-word">
+  {% for b in bloques %}
+    {% if b.tipo == "titulo" %}
+      {% if b.nivel == 1 %}<h2>{{ b.texto }}</h2>{% elif b.nivel == 2 %}<h3>{{ b.texto }}</h3>{% else %}<h4>{{ b.texto }}</h4>{% endif %}
+    {% elif b.tipo == "lista" %}
+      {% if b.numerada %}<ol>{% else %}<ul>{% endif %}
+        {% for elemento in b.elementos %}<li>{{ elemento }}</li>{% endfor %}
+      {% if b.numerada %}</ol>{% else %}</ul>{% endif %}
+    {% elif b.tipo == "tabla" %}
+      <table>{% for fila in b.filas %}<tr>{% for celda in fila %}<td>{{ celda }}</td>{% endfor %}</tr>{% endfor %}</table>
+    {% else %}
+      <p>{{ b.texto }}</p>
+    {% endif %}
+  {% endfor %}
+  </article>
+  <p class="ayuda">Vista de solo texto: el formato exacto (fuentes, imágenes) se ve al descargar el documento.</p>
+{% endif %}
+
+{% if aviso %}<p class="aviso-obsoleta">{{ aviso }}</p>{% endif %}
+
+<p><a class="enlace-boton secundario" href="{{ url_for('detalle', id=a.instruccion_id) }}">Volver a la instrucción</a></p>
+{% endblock %}
