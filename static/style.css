@@ -1,0 +1,140 @@
+/* =====================================================================
+   Hoja de estilos única del sitio
+   ===================================================================== */
+:root {
+  --azul: #0950c3;            /* azul de marca: títulos y enlaces */
+  --azul-hover: #003c9e;
+  --azul-profundo: #001848;   /* final de los degradados */
+  --navy: #020817;            /* pie de página */
+  --naranja: #ea550b;         /* botones de acción principal */
+  --naranja-hover: #c94506;
+  --texto: #0f1d3d;
+  --texto-suave: #5b6b85;
+  --fondo: #f8fafc;
+  --fondo-azul: #e9eff9;      /* fondos suaves y menú activo */
+  --borde: #e2e8f0;
+  --verde: #15803d;   --verde-fondo: #e7f6ec;
+  --rojo: #b91c1c;    --rojo-fondo: #fdecec;
+  --ambar: #b45309;   --ambar-fondo: #fff4e5;
+  --gris: #475569;    --gris-fondo: #eef1f6;
+  --sombra: 0 10px 30px rgba(9, 37, 94, .08);
+  --radio: 16px;
+}
+
+* { box-sizing: border-box; }
+body { font-family: "Ubuntu", "Segoe UI", Arial, Helvetica, sans-serif; background: var(--fondo);
+       color: var(--texto); margin: 0; line-height: 1.5; }
+main { max-width: 1240px; margin: -48px auto 0; padding: 0 24px 56px; position: relative; }
+a { color: var(--azul); }
+h2 { color: var(--azul); font-size: 1.35em; margin: 0 0 16px; }
+
+/* ---------- Barra superior (blanca, como en impresosmultiples) ---------- */
+.barra { background: #fff; border-bottom: 1px solid var(--borde); position: sticky; top: 0; z-index: 10; }
+.barra-contenido { max-width: 1240px; margin: 0 auto; padding: 12px 24px; display: flex;
+                   align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.marca { display: flex; align-items: center; gap: 14px; text-decoration: none; }
+.marca img { height: 46px; display: block; }
+.marca-sistema { border-left: 2px solid var(--borde); padding-left: 14px; color: var(--texto-suave);
+                 font-size: .8em; line-height: 1.25; }
+.barra nav { display: flex; gap: 6px; }
+.barra nav a { color: var(--texto); text-decoration: none; font-weight: 500; padding: 9px 16px; border-radius: 10px; }
+.barra nav a:hover { color: var(--azul); }
+.barra nav a.activo { background: var(--fondo-azul); color: var(--azul); }
+
+/* ---------- Franja de título (degradado azul de marca) ---------- */
+.hero { background: linear-gradient(115deg, var(--azul) 0%, #0048b4 45%, var(--azul-profundo) 85%, var(--navy) 100%);
+        color: #fff; text-align: center; padding: 44px 24px 88px; position: relative; overflow: hidden; }
+/* Círculos decorativos, inspirados en los empaques de la marca */
+.hero::before, .hero::after { content: ""; position: absolute; border-radius: 50%;
+                              border: 2px solid rgba(255,255,255,.12); }
+.hero::before { width: 320px; height: 320px; left: -90px; top: -150px; background: rgba(255,255,255,.04); }
+.hero::after  { width: 220px; height: 220px; right: 6%; bottom: -120px; }
+.hero-contenido { position: relative; max-width: 900px; margin: 0 auto; }
+.hero-antetitulo { margin: 0; color: #a9c6ff; font-size: .95em; letter-spacing: .03em; }
+.hero h1 { margin: 6px 0 4px; font-size: 2.4em; line-height: 1.15; }
+.hero-subtitulo { margin: 0; color: #dbe6fb; font-size: 1.05em; }
+
+/* ---------- Paneles blancos (como las tarjetas de su sitio) ---------- */
+.panel { background: #fff; border: 1px solid var(--borde); border-radius: var(--radio); box-shadow: var(--sombra);
+         padding: 24px 24px; margin-bottom: 24px; }
+.panel > table:last-child { margin-bottom: 0; }
+.panel { overflow-x: auto; }  /* si la pantalla es angosta, la tabla se desplaza dentro del panel */
+
+/* ---------- Tablas ---------- */
+table { border-collapse: collapse; width: 100%; background: #fff; margin-bottom: 8px; }
+th { background: #f1f5fb; color: var(--azul-profundo); padding: 12px 10px; text-align: left; font-size: .8em;
+     text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+td { padding: 11px 10px; border-bottom: 1px solid var(--borde); vertical-align: middle; font-size: .95em; }
+tbody tr:hover td { background: #f8fbff; }
+tr.falta_ambos td { background: #fff8f8; }
+tr.por_revisar td { background: var(--ambar-fondo); }
+tr.obsoleta td { color: var(--texto-suave); }
+td.acciones { white-space: nowrap; }
+td.acciones form { display: inline; }
+table:not(.detalle) td:first-child { white-space: nowrap; font-weight: 500; }
+/* Ficha de datos del detalle: etiquetas a la izquierda */
+table.detalle th { width: 220px; background: var(--fondo); text-transform: none; font-size: .95em;
+                   letter-spacing: 0; color: var(--texto-suave); font-weight: 500; }
+table.detalle td { font-weight: 500; }
+
+/* ---------- Formularios ---------- */
+form label { display: block; margin-top: 16px; margin-bottom: 6px; font-weight: 700; color: var(--azul-profundo); }
+input[type=text], input[type=file], select, textarea {
+  display: block; padding: 10px 12px; width: 380px; max-width: 100%; border: 1px solid #cbd5e1;
+  border-radius: 10px; font-family: inherit; font-size: 1em; background: #fff; color: var(--texto); }
+textarea { width: 560px; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--azul);
+                                            box-shadow: 0 0 0 3px rgba(9, 80, 195, .15); }
+.ayuda { font-size: .85em; color: var(--texto-suave); margin: 6px 0 0; }
+input[type=file]::file-selector-button { background: var(--fondo-azul); color: var(--azul); border: 1px solid #c8d6ef;
+  border-radius: 8px; padding: 6px 12px; margin-right: 10px; font-family: inherit; font-weight: 500; cursor: pointer; }
+
+/* ---------- Botones ---------- */
+button, .enlace-boton { display: inline-block; margin-top: 18px; padding: 10px 20px; background: var(--azul);
+  color: #fff; border: 1px solid var(--azul); border-radius: 10px; cursor: pointer; text-decoration: none;
+  font-size: 1em; font-family: inherit; font-weight: 500; transition: background .15s, border-color .15s; }
+button:hover, .enlace-boton:hover { background: var(--azul-hover); border-color: var(--azul-hover); }
+/* Acción principal (guardar, subir): naranja, como «Conoce Nuestras Capacidades» */
+button.accion { background: var(--naranja); border-color: var(--naranja); }
+button.accion:hover { background: var(--naranja-hover); border-color: var(--naranja-hover); }
+/* Secundario: blanco con borde, como «Enviar Email» */
+.enlace-boton.secundario, button.secundario { background: #fff; color: var(--azul); border-color: #c8d6ef; }
+.enlace-boton.secundario:hover, button.secundario:hover { background: var(--fondo-azul); border-color: var(--azul); }
+button.peligro { background: #fff; color: var(--rojo); border-color: #f1c4c4; }
+button.peligro:hover { background: var(--rojo); color: #fff; border-color: var(--rojo); }
+td.acciones .enlace-boton, td.acciones button { margin-top: 0; padding: 5px 10px; font-size: .85em; }
+
+
+/* ---------- Mensajes ---------- */
+.error, .exito, .aviso-archivada, .aviso-obsoleta { border-radius: 12px; padding: 12px 16px; font-weight: 500;
+                                                   border: 1px solid; border-left-width: 5px; }
+.error { color: var(--rojo); background: var(--rojo-fondo); border-color: #f1c4c4; border-left-color: var(--rojo); }
+ul.error { padding-left: 36px; }
+.exito { color: var(--verde); background: var(--verde-fondo); border-color: #bfe3cb; border-left-color: var(--verde); }
+.aviso-archivada, .aviso-obsoleta { color: var(--ambar); background: var(--ambar-fondo); border-color: #f6d9b0;
+                                    border-left-color: var(--naranja); }
+.vacio { font-style: italic; color: var(--texto-suave); }
+.ficha { background: var(--fondo-azul); padding: 12px 16px; border-radius: 12px; border-left: 5px solid var(--azul); }
+
+
+/* ---------- Pie de página (navy, como el de su sitio) ---------- */
+.pie { background: var(--navy); color: #cbd5e1; }
+.pie-contenido { max-width: 1240px; margin: 0 auto; padding: 44px 24px 28px; display: grid;
+                 grid-template-columns: 1.4fr 1fr 1fr; gap: 32px; }
+.pie-marca img { height: 44px; }
+.pie-lema { color: #fff; margin: 8px 0 0; }
+.pie h3 { color: #fff; margin: 0 0 12px; font-size: 1.05em; }
+.pie a { display: block; color: #cbd5e1; text-decoration: none; margin-bottom: 8px; }
+.pie a:hover { color: #fff; }
+.pie-texto { font-size: .92em; margin: 8px 0 0; line-height: 1.6; }
+.pie-legal { max-width: 1240px; margin: 0 auto; padding: 18px 24px 26px; border-top: 1px solid #1f2a44;
+             display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: .88em; }
+
+/* ---------- Pantallas pequeñas ---------- */
+@media (max-width: 760px) {
+  .hero h1 { font-size: 1.8em; }
+  .paso { flex-wrap: wrap; }
+  .marca-sistema { display: none; }
+  .pie-contenido { grid-template-columns: 1fr; }
+  .panel { padding: 18px; overflow-x: auto; }
+}
