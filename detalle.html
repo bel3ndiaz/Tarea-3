@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block titulo %}{{ i.codigo }}{% endblock %}
+{% block antetitulo %}{{ i.area }}{% endblock %}
+{% block encabezado %}{{ i.codigo }} · {{ i.titulo }}{% endblock %}
+{% block subtitulo %}Instrucción de trabajo · última actualización {{ i.fecha_actualizacion|fecha }}{% endblock %}
+{% block contenido %}
+{% if not i.activa %}
+<p class="aviso-archivada">Archivada el {{ i.fecha_archivado|fecha_hora }}. No aparece en el listado ni en el resumen;
+  sus documentos y su historial se conservan.</p>
+{% endif %}
+
+<section class="panel">
+  <h2>Datos de la instrucción</h2>
+  <table class="detalle">
+    <tr><th>Área</th><td>{{ i.area }}</td></tr>
+    <tr><th>Pasos</th><td>{{ pasos|length }}</td></tr>
+    <tr><th>Documento vigente</th>
+      <td>{% if versiones %}{{ versiones[0].datos.nombre_original }} (v{{ versiones[0].datos.version }})
+          {% else %}<span class="vacio">Sin documento</span>{% endif %}</td></tr>
+    <tr><th>Última actualización</th><td>{{ i.fecha_actualizacion|fecha }}</td></tr>
+    <tr><th>Video</th>
+      <td>{% if i.enlace_video %}<a href="{{ i.enlace_video }}" target="_blank" rel="noopener">{{ i.enlace_video }}</a>{% else %}<span class="vacio">Sin enlace</span>{% endif %}</td></tr>
+  </table>
+</section>
+
+<section class="panel hoja-pasos">
+  <div class="encabezado-panel">
+    <h2>Pasos de la instrucción</h2>
+    {% if pasos %}<button type="button" class="secundario imprimir" onclick="window.print()">Imprimir instrucción</button>{% endif %}
+  </div>
+  {% if pasos %}
+  <ol class="pasos-lectura">
+    {% for p in pasos %}
+    <li>
+      <span class="paso-numero">{{ p.numero }}</span>
+      <div>
+        <p class="paso-texto">{{ p.descripcion }}</p>
+        {% if p.punto_control %}<p class="paso-control"><strong>Punto de control:</strong> {{ p.punto_control }}</p>{% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p class="vacio">Esta instrucción todavía no tiene pasos escritos.
+    <a href="{{ url_for('editar', id=i.id) }}">Agregar pasos</a></p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Versiones del documento</h2>
+  {% if versiones %}
+  <table>
+    <thead><tr><th>Versión</th><th>Archivo</th><th>Qué cambió</th><th>Tamaño</th><th>Video</th><th>Subido</th><th>Estado</th><th>Acciones</th></tr></thead>
+    <tbody>
+    {% for v in versiones %}
+      {% set a = v.datos %}
+      <tr class="{{ v.estado }}">
+        <td>v{{ a.version }}</td>
+        <td class="archivo">{{ a.nombre_original }} <span class="tipo">{{ a.extension|upper }}</span></td>
+        <td>{{ a.nota_cambio or '—' }}</td>
+        <td>{{ a.tamano_bytes|tamano }}</td>
+        <td>{% if a.video_version %}<a href="{{ a.video_version }}" target="_blank" rel="noopener">Ver video</a>{% else %}—{% endif %}</td>
+        <td>{{ a.fecha_subida|fecha_hora }}</td>
+        <td>
+          {% if v.estado == "vigente" %}<span class="etiqueta vigente">Vigente</span>
+          {% elif v.estado == "obsoleta" %}<span class="etiqueta obsoleta">Obsoleta</span>
+          {% else %}<span class="etiqueta por_revisar">Por revisar</span>{% endif %}
+        </td>
+        <td class="acciones">
+          <a class="enlace-boton" href="{{ url_for('descargar', id=a.archivo_id) }}">Descargar</a>
+          <a class="enlace-boton secundario" href="{{ url_for('vista_previa', id=a.archivo_id) }}">Vista previa</a>
+          {% if v.estado == "obsoleta" and i.activa %}
+          <form method="POST" action="{{ url_for('restaurar', id=a.archivo_id) }}"
+                onsubmit="return confirm('¿Restaurar la versión {{ a.version }} como nueva versión vigente? Las demás versiones se conservan.');">
+            <button type="submit" class="secundario">Restaurar</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="vacio">Esta instrucción todavía no tiene documento. Usa «Subir documento» para cargar la versión 1.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Historial de versiones</h2>
+  {% if historial %}
+  <table>
+    <thead><tr><th>Fecha</th><th>Versión</th><th>Movimiento</th></tr></thead>
+    <tbody>
+    {% for h in historial %}
+      <tr><td>{{ h.fecha|fecha_hora }}</td><td>v{{ h.version }}</td><td>{{ h.accion }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="vacio">Sin movimientos registrados.</p>
+  {% endif %}
+</section>
+
+<p><a class="enlace-boton secundario" href="{{ url_for('listar') }}">Volver al listado</a>
+<a class="enlace-boton secundario" href="{{ url_for('editar', id=i.id) }}">Modificar datos y pasos</a>
+{% if i.activa %}
+<a class="enlace-boton" href="{{ url_for('subir', id=i.id) }}">Subir documento</a></p>
+<form method="POST" action="{{ url_for('archivar', id=i.id) }}"
+      onsubmit="return confirm('¿Archivar {{ i.codigo }}? Dejará de aparecer en el listado y el resumen, pero no se borra nada.');">
+  <button type="submit" class="peligro">Archivar</button>
+</form>
+{% else %}
+</p>
+<form method="POST" action="{{ url_for('reactivar', id=i.id) }}">
+  <button type="submit" class="accion">Reactivar instrucción</button>
+</form>
+{% endif %}
+{% endblock %}
